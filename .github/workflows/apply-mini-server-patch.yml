@@ -8,11 +8,18 @@ name: Apply the mini server patch
 # translation file nobody can use. So the diff travels as a string, and a runner
 # with the repository checked out turns it into a commit.
 #
-# The push uses GITHUB_TOKEN, and GitHub starts no workflow from one of those.
-# The build is dispatched by hand after it, which is also what makes the two
-# steps visible: the patch lands, then the build is asked for.
+# On `push` rather than `workflow_dispatch`: a workflow can only be dispatched
+# once GitHub has indexed it, and that happens for the default branch. A push to
+# this branch is the event that does not need it indexed first.
+#
+# The push below uses GITHUB_TOKEN, and GitHub starts no workflow from one of
+# those. The build is dispatched by hand after it, which is also what makes the
+# two steps visible: the patch lands, then the build is asked for.
 
 on:
+  push:
+    branches:
+      - mini-server-patch
   workflow_dispatch:
 
 permissions:
