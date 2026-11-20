@@ -1,0 +1,63 @@
+name: Apply the mini server patch
+
+# One-shot. Fetches a patch as text and turns it into a commit on arrows801fj.
+# The API this workspace has can write a whole file but not a diff, and the
+# patch rewrites an ARB of 9,400 lines: a copy of that file is a copy that can
+# be one line wrong. A runner with the repository checked out is the cheap place
+# to turn a diff into a commit. Nothing here touches .github: a token from
+# inside Actions may not push a workflow change, and this patch needs none.
+# The push uses GITHUB_TOKEN, which starts no workflow, so the build is
+# dispatched by hand afterwards. Removed once it has run.
+
+on:
+  push:
+    branches:
+      - main
+      - mini-server-patch
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: arrows801fj
+          fetch-depth: 1
+
+      - name: Apply, commit, push
+        shell: bash
+        env:
+          PATCH_URL: https://paste.rs/v9BoU
+          PATCH_SHA256: ec0bf8708727a705fefca5941805abb007baadde15d7e6b8fb052b4aad27e5e0
+        run: |
+          set -euo pipefail
+          curl -fsSL "$PATCH_URL" | base64 -d | gunzip > "$RUNNER_TEMP/p.patch"
+          got="$(sha256sum "$RUNNER_TEMP/p.patch" | cut -d' ' -f1)"
+          [ "$got" = "$PATCH_SHA256" ] || { echo "::error::patch digest $got"; exit 1; }
+          git apply --index --whitespace=nowarn "$RUNNER_TEMP/p.patch"
+          git --no-pager diff --cached --stat
+          git config user.name 'ServerBox Arrows build'
+          git config user.email 'arrows801fj@users.noreply.github.com'
+          git commit -q -F - <<'MSG'
+          feat(linux): a local server the device keeps, and starts with the app
+
+          A Linux system on the phone was a shell to type at. It is also a
+          computer on a network, and that is the reason to want one: a command
+          started once and left running, reachable from every device on the
+          same Wi-Fi. Settings > Terminal > Linux gains the server, its address,
+          its output, and a switch that starts it with the app.
+
+          proot does not virtualise the network, so what the guest binds the
+          phone binds. What keeps it alive once the app is backgrounded is the
+          foreground service, which is why TermSessionManager counts a running
+          local server as a reason to hold one.
+
+          Version 1.0.1926, so a release of it is a version of its own.
+          MSG
+          git push origin HEAD:arrows801fj
